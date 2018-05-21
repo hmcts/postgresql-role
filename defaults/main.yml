@@ -1,0 +1,29 @@
+---
+# postgresql_repo_base_url: "https://download.postgresql.org/pub/repos/yum"
+postgresql_repo_base_url: "https://artifactory.reform.hmcts.net/artifactory/ext-postgresql"
+postgresql_repo_full_url: "{{ postgresql_repo_base_url }}/{{ postgresql_version }}/redhat/rhel-$releasever-$basearch"
+postgresql_repo_gpg_key_url: "{{ postgresql_repo_base_url }}/{{ postgresql_repo_gpg_key_file }}"
+postgresql_repo_gpg_key_file: "RPM-GPG-KEY-PGDG-{{ postgresql_version_short }}"
+postgresql_yum_repository_template: pgdg-NN-redhat.repo.j2
+# postgresql_repo_proxy:
+postgresql_version: '9.6'
+postgresql_hba_config_template: pg_hba.conf.j2
+postgresql_archive: 'on'
+postgresql_service_manage: true
+postgresql_service_enable: true
+postgresql_service_state: started
+postgresql_include_general_template: postgresql-include-00general.conf.j2
+postgresql_include_specific_template: postgresql-include-01specific.conf.j2
+postgresql_database: []
+postgresql_user: []
+postgresql_superuser: []
+postgresql_custom_sql: []
+postgresql_hba_config_entries: []
+postgresql_max_wal_senders: 3
+postgresql_wal_level: 'replica'
+# Prepared transactions must be explicitly enabled
+postgresql_prepared_transactions_enable: false
+
+postgresql_ssl_enabled: on
+postgresql_ssl_key: "{{ lookup('hashi_vault', 'secret=secret/devops/dev/ssl/ssl_key_STAR_reform_hmcts_net:value') | replace('\\n', '\n') }}"
+postgresql_ssl_crt: "{{ lookup('hashi_vault', 'secret=secret/devops/dev/ssl/ssl_crt_STAR_reform_hmcts_net:value') | replace('\\n', '\n') }}"

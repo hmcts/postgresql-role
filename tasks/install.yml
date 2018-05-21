@@ -1,0 +1,49 @@
+---
+- name: Calculate the postgres short version
+  set_fact:
+    postgresql_version_short: "{{ postgresql_version | regex_replace('^(?P<major>.+).(?P<minor>\\d+)$', '\\g<major>\\g<minor>') }}"
+
+- name: Dump postgresql_yum_repository_template for debugging
+  debug:
+    var: postgresql_yum_repository_template
+
+- name: Install rpm dependencies
+  become: yes
+  yum:
+    name: "{{ item }}"
+    state: installed
+  with_items:
+    - "libxslt"
+    - "systemd-sysv"
+    - "sudo"
+    - "python-psycopg2"
+    - "python2-pip"
+
+- name: PostgreSQL | Install yum repository
+  yum_repository:
+    name: "pgdg{{ postgresql_version_short }}"
+    description: "PostgreSQL {{ postgresql_version }} $releasever - $basearch"
+    baseurl: "{{ postgresql_repo_full_url }}"
+    enabled: no
+    gpgkey: "{{ postgresql_repo_gpg_key_url }}"
+    gpgcheck: yes
+
+- name: PostgreSQL | Install
+  become: yes
+  yum:
+    name: "{{ item }}"
+    state: installed
+    disablerepo: "*"
+    enablerepo: "pgdg{{ postgresql_version_short }}"
+  with_items:
+    - "postgresql{{ postgresql_version_short }}"
+    - "postgresql{{ postgresql_version_short }}-server"
+    - "postgresql{{ postgresql_version_short }}-contrib"
+    - "postgresql{{ postgresql_version_short }}-devel"
+    - "postgresql{{ postgresql_version_short }}-libs"
+
+- name: PostgreSQL | Initialise database cluster
+  become: yes
+  command: /usr/pgsql-{{ postgresql_version }}/bin/postgresql{{ postgresql_version_short }}-setup initdb
+  args:
+    creates: "/var/lib/pgsql/{{ postgresql_version }}/data/postgresql.conf"

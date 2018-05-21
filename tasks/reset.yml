@@ -1,0 +1,11 @@
+---
+- name: PostgreSQL | Stop service - runs only if postgresql_reset=true is set
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    state: stopped
+  ignore_errors: true
+
+- name: PostgreSQL | Delete data directory - runs only if postgresql_reset=true is set
+  file:
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data
+    state: absent

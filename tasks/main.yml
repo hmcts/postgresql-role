@@ -1,0 +1,13 @@
+---
+- include: reset.yml
+  tags: reset
+  when: ( postgresql_reset is defined ) and ( postgresql_reset | bool )
+
+- include: install.yml
+  tags: install
+
+- include: configure.yml
+  tags: configure
+
+- include: backups.yml
+  tags: backups

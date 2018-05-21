@@ -1,0 +1,162 @@
+---
+
+- name: PostgreSQL | Template pg_hba.conf
+  become: yes
+  template:
+    src: "{{ postgresql_hba_config_template }}"
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data/pg_hba.conf
+    group: postgres
+    owner: postgres
+  notify: Reload PostgreSQL
+
+- name: PostgreSQL | Create conf.d include directory
+  become: yes
+  file:
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data/conf.d
+    group: postgres
+    owner: postgres
+    state: directory
+
+- name: PostgreSQL | Create a write ahead logs directory
+  become: yes
+  file:
+    dest: /var/lib/pgsql/{{ postgresql_version }}/backups/wals
+    group: postgres
+    owner: postgres
+    state: directory
+
+
+- name: PostgreSQL | Template postgresql.conf
+  become: yes
+  template:
+    src: "templates/postgresql.conf-{{ postgresql_version }}.j2"
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data/postgresql.conf
+    group: postgres
+    owner: postgres
+  notify: Reload PostgreSQL
+
+- name: PostgreSQL | Template conf.d include file (general settings)
+  become: yes
+  template:
+    src: "{{ postgresql_include_general_template }}"
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data/conf.d/00general.conf
+    group: postgres
+    owner: postgres
+  notify: Restart PostgreSQL
+
+- name: PostgreSQL | Template conf.d include file (specific settings)
+  become: yes
+  template:
+    src: "{{ postgresql_include_specific_template }}"
+    dest: /var/lib/pgsql/{{ postgresql_version }}/data/conf.d/01specific.conf
+    group: postgres
+    owner: postgres
+  notify: Restart PostgreSQL
+
+- name: "Write SSL cert to temp file"
+  copy:
+    dest: "/var/lib/pgsql/{{ postgresql_version }}/data/server.tmp"
+    content: "{{ postgresql_ssl_crt }}"
+    mode: 0400
+    owner: postgres
+    group: postgres
+  tags: postgres-ssl
+
+- name: "Make sure the SSL certificate is not about to expire"
+  command: /bin/openssl x509 -checkend 2592000 -noout -in /var/lib/pgsql/{{ postgresql_version }}/data/server.tmp
+  register: ssh_check_result
+  failed_when: "ssh_check_result.rc != 0"
+  changed_when: false
+  tags: postgres-ssl
+
+- name: "Write SSL cert to file"
+  copy:
+    dest: "/var/lib/pgsql/{{ postgresql_version }}/data/server.crt"
+    content: "{{ postgresql_ssl_crt }}"
+    mode: 0400
+    owner: postgres
+    group: postgres
+  notify: Restart PostgreSQL
+  tags: postgres-ssl
+
+- name: "Write SSL key to file"
+  copy:
+    dest: "/var/lib/pgsql/{{ postgresql_version }}/data/server.key"
+    content: "{{ postgresql_ssl_key }}"
+    mode: 0400
+    owner: postgres
+    group: postgres
+  notify: Restart PostgreSQL
+  tags: postgres-ssl
+
+- name: PostgreSQL | Enable service
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    enabled: "{{ postgresql_service_enable }}"
+  when: postgresql_service_manage
+
+- name: PostgreSQL | Start service
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    state: "{{ postgresql_service_state }}"
+  when: postgresql_service_manage
+
+- name: PostgreSQL | Check if Replication Manager exists and if so determine who is the master
+  become: yes
+  become_user: postgres
+  shell: |
+    psql -U repmgr -d repmgr -w -t -c "select name from repmgr_{{ repmgr_cluster }}.repl_nodes where type='master' and active='t';" | sed -e 's/\ //g'
+  register: repmgr_master_check
+  when: repmgr_ha_enabled is defined and repmgr_ha_enabled
+  changed_when: false
+  ignore_errors: true
+
+- name: PostgreSQL | Create users
+  become: yes
+  become_user: postgres
+  postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    port: "{{ postgresql_listen_port | default('5432')}}"
+  with_items: "{{ postgresql_user }}"
+  delegate_to: "{{ inventory_hostname if repmgr_master_check.stdout is not defined or repmgr_master_check.stdout | length < 1 else repmgr_master_check.stdout }}"
+  run_once: true
+  no_log: true
+
+- name: PostgreSQL | Create databases
+  become: yes
+  become_user: postgres
+  postgresql_db:
+    name: "{{ item.name }}"
+    encoding: "{{ item.encoding | default('UTF-8') }}"
+    lc_collate: "{{ item.locale | default('en_GB.UTF-8') }}"
+    lc_ctype: "{{ item.locale | default('en_GB.UTF-8') }}"
+    template: template0
+    owner: "{{ item.owner | default('postgres') }}"
+    port: "{{ postgresql_listen_port | default('5432')}}"
+  with_items: "{{ postgresql_database }}"
+  delegate_to: "{{ inventory_hostname if repmgr_master_check.stdout is not defined or repmgr_master_check.stdout | length < 1 else repmgr_master_check.stdout }}"
+  run_once: true
+
+- name: PostgreSQL | Configure superuser for each database
+  become: yes
+  become_user: postgres
+  postgresql_user:
+    db: "{{ item.db }}"
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: SUPERUSER
+    port: "{{ postgresql_listen_port | default('5432')}}"
+  with_items: "{{ postgresql_superuser }}"
+  delegate_to: "{{ inventory_hostname if repmgr_master_check.stdout is not defined or repmgr_master_check.stdout | length < 1 else repmgr_master_check.stdout }}"
+  run_once: true
+
+- name: PostgreSQL | Run custom SQL
+  become: yes
+  become_user: postgres
+  command: "psql -d {{ item.db }} -c '{{ item.sql }}' -p '{{ postgresql_listen_port | default('5432')}}'"
+  with_items: "{{ postgresql_custom_sql }}"
+  ignore_errors: yes
+  changed_when: false
+  delegate_to: "{{ inventory_hostname if repmgr_master_check.stdout is not defined or repmgr_master_check.stdout | length < 1 else repmgr_master_check.stdout }}"
+  run_once: true

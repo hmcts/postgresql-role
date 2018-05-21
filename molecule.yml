@@ -1,0 +1,25 @@
+---
+dependency:
+  name: galaxy
+  requirements_file: requirements.yml
+driver:
+  name: docker
+docker:
+  containers:
+    - name: postgresql-role-${BRANCH_NAME}-${BUILD_NUMBER}
+      dockerfile: Dockerfile
+      image: centos/systemd
+      image_version: latest
+      build_image: yes
+      disable_cache: true
+      privileged: yes
+      cap_add:
+        - SYS_ADMIN
+      environment:
+        http_proxy: "http://reformmgmtproxyout.reform.hmcts.net:8080/"
+        https_proxy: "http://reformmgmtproxyout.reform.hmcts.net:8080/"
+ansible:
+#  verbose: True
+  playbook: tests/playbook.yml
+verifier:
+  name: testinfra

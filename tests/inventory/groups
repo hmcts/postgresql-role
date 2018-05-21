@@ -1,0 +1,9 @@
+postgresql-role
+app01
+app02
+
+[postgresql-role]
+
+[role_be]
+app01
+app02

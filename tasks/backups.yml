@@ -1,0 +1,9 @@
+---
+
+- name: Copy rsync-wrapper for backing up files
+  copy:
+    src: rsync-wrapper.sh
+    dest: "/usr/local/bin/rsync-wrapper.sh"
+    owner: root
+    group: root
+    mode: 0755

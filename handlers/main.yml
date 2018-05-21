@@ -1,0 +1,21 @@
+---
+- name: Restart PostgreSQL
+  become: yes
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    state: restarted
+    daemon-reload: yes
+
+- name: Start PostgreSQL
+  become: yes
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    state: started
+    daemon-reload: yes
+
+- name: Reload PostgreSQL
+  become: yes
+  systemd:
+    name: postgresql-{{ postgresql_version }}
+    state: reloaded
+    daemon-reload: yes

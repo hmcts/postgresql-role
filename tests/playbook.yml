@@ -1,0 +1,31 @@
+---
+
+- hosts: all
+  gather_facts: true
+  tasks:
+    - name: Install openssl
+      yum:
+        name: openssl
+        state: present
+    - name: Add test certificate
+      command: "openssl req -x509 -newkey rsa:4096 -sha256 -nodes -keyout /hmcts.key -out  /hmcts.crt -subj /CN=postgresql-test.reform.hmcts.net -days 3650"
+      args:
+        creates: "/hmcts.*"
+    - name: slurp certificate
+      slurp:
+        src: /hmcts.crt
+      register: crtslurp
+    - name: slurp key
+      slurp:
+        src: /hmcts.key
+      register: keyslurp
+- hosts: all
+  gather_facts: true
+  vars:
+    postgresql_ssl_key: "{{ keyslurp['content'] | b64decode }}"
+    postgresql_ssl_crt: "{{ crtslurp['content'] | b64decode }}"
+  tasks:
+    - name: Include environment specific vars
+      include_vars: "vars.yml"
+  roles:
+    - role: postgresql-role

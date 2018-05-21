@@ -1,0 +1,23 @@
+---
+
+db01_name: "db01"
+db02_name: "db02"
+db_user: "test_user"
+
+postgresql_version: "9.6"
+postgresql_listen_addresses: "'*'"
+postgresql_reset: false
+
+postgresql_user:
+  - name: "{{ db_user }}"
+    password: "{{ lookup('password', '/dev/null length=15 chars=ascii_letters') }}"
+
+postgresql_database:
+  - name: "{{ db01_name }}"
+  - name: "{{ db02_name }}"
+
+postgresql_custom_sql:
+  - db: "{{ db01_name }}"
+    sql: "GRANT CREATE, USAGE ON SCHEMA public TO {{ db_user }};"
+  - db: "{{ db02_name }}"
+    sql: "GRANT CREATE, USAGE ON SCHEMA public TO {{ db_user }};"

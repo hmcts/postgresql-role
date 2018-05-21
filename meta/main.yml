@@ -1,0 +1,8 @@
+galaxy_info:
+  author: Reform Programme
+  description: Install PostgreSQL server
+  company: HMCTS Reform Programme
+  min_ansible_version: 1.2
+
+dependencies:
+  - { role: devops.repos }
